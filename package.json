@@ -1,0 +1,19 @@
+{
+  "name": "ai-orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "apps/microservices/*"
+  ],
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "build": "yarn workspaces run build",
+    "test": "yarn workspaces run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.19",
+    "ts-node": "^10.9.2"
+  }
+}

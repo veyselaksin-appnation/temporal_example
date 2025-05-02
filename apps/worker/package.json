@@ -1,0 +1,28 @@
+{
+  "name": "@ai-orchestrator/worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "start:local": "TEMPORAL_ADDRESS=temporal:7233 ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@temporalio/worker": "^1.9.0",
+    "@temporalio/workflow": "^1.9.0",
+    "@temporalio/client": "^1.9.0",
+    "@temporalio/activity": "^1.9.0",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@types/axios": "^0.14.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
