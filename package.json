@@ -4,10 +4,11 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "apps/microservices/*"
+    "apps/microservices/*",
+    "packages/*"
   ],
   "scripts": {
-    "dev": "docker-compose up --build",
+    "dev": "docker-compose --verbose up --build",
     "build": "yarn workspaces run build",
     "test": "yarn workspaces run test"
   },

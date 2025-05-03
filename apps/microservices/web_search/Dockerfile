@@ -1,15 +1,13 @@
-FROM node:20
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install TypeScript globally
-RUN yarn global add typescript
+# Copy root package.json and yarn.lock
+COPY package.json yarn.lock ./
 
-# Copy root package.json
-COPY package.json ./
-
-# Copy workspace package.json
+# Copy workspace package.json files
 COPY apps/microservices/web_search/package.json ./apps/microservices/web_search/
+COPY packages/openai-client/package.json ./packages/openai-client/
 
 # Install dependencies
 RUN yarn install
@@ -23,5 +21,5 @@ RUN yarn workspace @ai-orchestrator/web-search build
 # Expose the port
 EXPOSE 3002
 
-# Start the service
+# Start the application
 CMD ["yarn", "workspace", "@ai-orchestrator/web-search", "start"] 

@@ -1,6 +1,7 @@
 import fastify from "fastify";
 import { Client } from "@temporalio/client";
 import { Connection } from "@temporalio/client";
+import { Callit } from "./callit/callit";
 
 interface PromptRequest {
   prompt: string;
@@ -13,26 +14,8 @@ interface PromptResponse {
 
 const app = fastify();
 
-// Mock AI function caller
-async function mockAIFunctionCaller(prompt: string) {
-  // This is a simple mock implementation
-  if (prompt.toLowerCase().includes("joke")) {
-    return {
-      function: "text2text",
-      arguments: {
-        input: prompt,
-      },
-    };
-  } else if (prompt.toLowerCase().includes("search")) {
-    return {
-      function: "web_search",
-      arguments: {
-        query: prompt,
-      },
-    };
-  }
-  throw new Error("No matching function found");
-}
+// Initialize Callit with OpenAI API key
+const callit = new Callit(process.env.OPENAI_API_KEY || "");
 
 // Initialize Temporal client
 const start = async () => {
@@ -51,8 +34,10 @@ const start = async () => {
         try {
           const { prompt } = request.body;
 
-          // Get function call from mock AI
-          const functionCall = await mockAIFunctionCaller(prompt);
+          // Get function call from Callit
+          const functionCall = await callit.createCompletion({ prompt });
+
+          console.log("Function call:", functionCall);
 
           // Start workflow
           const handle = await temporalClient.workflow.start(

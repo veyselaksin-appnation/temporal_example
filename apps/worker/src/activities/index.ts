@@ -22,7 +22,16 @@ export async function callMicroservice(
   }
 
   try {
-    const response = await axios.post(serviceUrl, args);
+    let requestBody = args;
+
+    // Format request body based on service
+    if (functionName === "web_search") {
+      requestBody = { query: args.input };
+    } else if (functionName === "text2text") {
+      requestBody = { input: args.input };
+    }
+
+    const response = await axios.post(serviceUrl, requestBody);
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {

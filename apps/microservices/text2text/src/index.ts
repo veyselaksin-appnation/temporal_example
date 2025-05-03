@@ -1,4 +1,5 @@
-import fastify from "fastify";
+import fastify, { FastifyRequest, FastifyReply } from "fastify";
+import { OpenAIClient } from "@ai-orchestrator/openai-client";
 
 interface Text2TextRequest {
   input: string;
@@ -11,23 +12,31 @@ interface Text2TextResponse {
 
 const app = fastify();
 
-// Mock text processing function
+const openaiClient = new OpenAIClient({
+  apiKey: process.env.OPENAI_API_KEY || "",
+});
+
+const systemPrompt = `You are a helpful AI assistant. Your responses should be clear, concise, and accurate. 
+When providing information, always ensure it is factually correct and up-to-date. 
+If you're unsure about something, acknowledge the uncertainty rather than providing potentially incorrect information.
+Format your response in a way that is easy to read and understand.`;
+
 async function processText(input: string): Promise<string> {
-  // This is a simple mock implementation
-  if (input.toLowerCase().includes("joke")) {
-    return "Why did the AI go to school? To get more artificial intelligence!";
-  }
-  return `Processed: ${input}`;
+  return openaiClient.processText(systemPrompt, input);
 }
 
 app.post<{ Body: Text2TextRequest; Reply: Text2TextResponse }>(
   "/process",
-  async (request, reply) => {
+  async (
+    request: FastifyRequest<{ Body: Text2TextRequest }>,
+    reply: FastifyReply
+  ) => {
     try {
       const { input } = request.body;
       const output = await processText(input);
       return { output };
     } catch (error) {
+      console.error("Error processing text:", error);
       return reply.status(500).send({
         output: "",
         error:

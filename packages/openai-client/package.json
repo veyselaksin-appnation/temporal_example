@@ -1,0 +1,17 @@
+{
+  "name": "@ai-orchestrator/openai-client",
+  "version": "1.0.0",
+  "description": "Shared OpenAI client configuration for microservices",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "openai": "^4.28.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

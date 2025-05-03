@@ -11,7 +11,8 @@
   "dependencies": {
     "@temporalio/client": "^1.9.0",
     "fastify": "^4.24.3",
-    "@fastify/cors": "^7.0.0"
+    "@fastify/cors": "^7.0.0",
+    "openai": "^4.28.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",

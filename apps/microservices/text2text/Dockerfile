@@ -1,15 +1,13 @@
-FROM node:20
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install TypeScript globally
-RUN yarn global add typescript
+# Copy root package.json and yarn.lock
+COPY package.json yarn.lock ./
 
-# Copy root package.json
-COPY package.json ./
-
-# Copy workspace package.json
+# Copy workspace package.json files
 COPY apps/microservices/text2text/package.json ./apps/microservices/text2text/
+COPY packages/openai-client/package.json ./packages/openai-client/
 
 # Install dependencies
 RUN yarn install
@@ -23,5 +21,5 @@ RUN yarn workspace @ai-orchestrator/text2text build
 # Expose the port
 EXPOSE 3001
 
-# Start the service
+# Start the application
 CMD ["yarn", "workspace", "@ai-orchestrator/text2text", "start"] 

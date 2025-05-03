@@ -1,7 +1,6 @@
 import { Worker } from "@temporalio/worker";
 import { NativeConnection } from "@temporalio/worker";
 import * as activities from "./activities";
-import { orchestrateFunction } from "./workflows/orchestrateFunction";
 import path from "path";
 
 async function run() {
