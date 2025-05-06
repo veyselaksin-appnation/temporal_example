@@ -57,6 +57,7 @@ app.post<{ Body: Text2TextRequest; Reply: Text2TextResponse }>(
 
         for await (const chunk of streamResponse) {
           const data = JSON.stringify({ output: chunk });
+          console.log("Data: ", data);
           reply.raw.write(`data: ${data}\n\n`);
         }
 
