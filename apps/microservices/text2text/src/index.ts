@@ -3,6 +3,7 @@ import { OpenAIClient } from "@ai-orchestrator/openai-client";
 
 interface Text2TextRequest {
   input: string;
+  stream?: boolean;
 }
 
 interface Text2TextResponse {
@@ -12,8 +13,10 @@ interface Text2TextResponse {
 
 const app = fastify();
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
 const openaiClient = new OpenAIClient({
-  apiKey: process.env.OPENAI_API_KEY || "",
+  apiKey: OPENAI_API_KEY || "",
 });
 
 const systemPrompt = `You are a helpful AI assistant. Your responses should be clear, concise, and accurate. 
@@ -21,8 +24,15 @@ When providing information, always ensure it is factually correct and up-to-date
 If you're unsure about something, acknowledge the uncertainty rather than providing potentially incorrect information.
 Format your response in a way that is easy to read and understand.`;
 
-async function processText(input: string): Promise<string> {
-  return openaiClient.processText(systemPrompt, input);
+async function processText(
+  input: string,
+  stream: boolean = false
+): Promise<string | AsyncIterable<string>> {
+  const messages = [
+    { role: "system" as const, content: systemPrompt },
+    { role: "user" as const, content: input },
+  ];
+  return openaiClient.createChatCompletion(messages, stream);
 }
 
 app.post<{ Body: Text2TextRequest; Reply: Text2TextResponse }>(
@@ -32,11 +42,42 @@ app.post<{ Body: Text2TextRequest; Reply: Text2TextResponse }>(
     reply: FastifyReply
   ) => {
     try {
-      const { input } = request.body;
-      const output = await processText(input);
-      return { output };
+      const { input, stream = false } = request.body;
+
+      if (stream) {
+        reply.raw.setHeader("Content-Type", "text/event-stream");
+        reply.raw.setHeader("Cache-Control", "no-cache");
+        reply.raw.setHeader("Connection", "keep-alive");
+        reply.raw.setHeader("X-Accel-Buffering", "no");
+
+        const streamResponse = (await processText(
+          input,
+          true
+        )) as AsyncIterable<string>;
+
+        for await (const chunk of streamResponse) {
+          const data = JSON.stringify({ output: chunk });
+          reply.raw.write(`data: ${data}\n\n`);
+        }
+
+        reply.raw.end();
+        return reply;
+      } else {
+        const output = (await processText(input)) as string;
+        return { output };
+      }
     } catch (error) {
       console.error("Error processing text:", error);
+      if (request.body.stream) {
+        reply.raw.write(
+          `data: ${JSON.stringify({
+            error:
+              error instanceof Error ? error.message : "Unknown error occurred",
+          })}\n\n`
+        );
+        reply.raw.end();
+        return reply;
+      }
       return reply.status(500).send({
         output: "",
         error:

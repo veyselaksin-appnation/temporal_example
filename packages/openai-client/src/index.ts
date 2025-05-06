@@ -24,24 +24,48 @@ export class OpenAIClient {
   }
 
   async createChatCompletion(
-    messages: { role: "system" | "user" | "assistant"; content: string }[]
-  ): Promise<string> {
+    messages: { role: "system" | "user" | "assistant"; content: string }[],
+    stream: boolean = false
+  ): Promise<string | AsyncIterable<string>> {
     const completion = await this.client.chat.completions.create({
       model: this.config.model!,
       messages,
       temperature: this.config.temperature,
       max_tokens: this.config.maxTokens,
+      stream,
     });
 
-    console.log("Completion:", completion);
+    if (stream) {
+      return this.streamResponse(completion as AsyncIterable<any>);
+    }
 
-    return completion.choices[0].message.content || "";
+    const nonStreamCompletion = completion as any;
+    console.log("Completion:", nonStreamCompletion);
+    return nonStreamCompletion.choices[0].message.content || "";
   }
 
-  async processText(systemPrompt: string, userInput: string): Promise<string> {
-    return this.createChatCompletion([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userInput },
-    ]);
+  private async *streamResponse(
+    completion: AsyncIterable<any>
+  ): AsyncIterable<string> {
+    for await (const chunk of completion) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      if (content) {
+        yield content;
+      }
+    }
+  }
+
+  async processText(
+    systemPrompt: string,
+    userInput: string,
+    stream: boolean = false
+  ): Promise<string | AsyncIterable<string>> {
+    return this.createChatCompletion(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userInput },
+      ],
+      stream
+    );
   }
 }

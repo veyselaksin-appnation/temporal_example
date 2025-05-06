@@ -6,24 +6,34 @@ interface WebSearchRequest {
 }
 
 interface WebSearchResponse {
-  results: string[];
+  results: string;
+  function: string;
   error?: string;
 }
 
 const app = fastify();
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
 const openaiClient = new OpenAIClient({
-  apiKey: process.env.OPENAI_API_KEY || "",
+  apiKey: OPENAI_API_KEY || "",
 });
 
 const systemPrompt = `You are a helpful AI assistant specialized in web search. 
 When given a search query, provide relevant and accurate information.
 Format your response in a clear and organized manner.`;
 
-async function processSearch(query: string): Promise<string[]> {
+async function processSearch(query: string): Promise<string> {
+  console.log("Task here");
   const response = await openaiClient.processText(systemPrompt, query);
-  console.log("Response:", response);
-  return [response]; // For now, return a single result
+  if (typeof response === "string") {
+    return response;
+  }
+  let fullResponse = "";
+  for await (const chunk of response) {
+    fullResponse += chunk;
+  }
+  return fullResponse;
 }
 
 app.post<{ Body: WebSearchRequest; Reply: WebSearchResponse }>(
@@ -36,11 +46,11 @@ app.post<{ Body: WebSearchRequest; Reply: WebSearchResponse }>(
       const { query } = request.body;
       console.log("Query:", query);
       const results = await processSearch(query);
-      return { results };
+      return { function: "web_search", results };
     } catch (error) {
       console.error("Error processing search:", error);
       return reply.status(500).send({
-        results: [],
+        results: "",
         error:
           error instanceof Error ? error.message : "Unknown error occurred",
       });

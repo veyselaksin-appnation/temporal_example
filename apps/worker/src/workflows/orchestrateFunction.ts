@@ -1,21 +1,21 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { defineSignal, setHandler } from "@temporalio/workflow";
 
 const { callMicroservice } = proxyActivities<typeof activities>({
-  startToCloseTimeout: "10 seconds",
-  retry: {
-    maximumAttempts: 3,
-  },
+  startToCloseTimeout: "1 minute",
 });
 
-export async function orchestrateFunction(functionCall: any): Promise<any> {
+// Define signal
+export const dummySignal = "dummySignal";
+export const streamSignal = "streamSignal";
+
+export async function orchestrateFunction(prompt: string) {
   try {
-    const result = await callMicroservice(functionCall);
+    const result = await callMicroservice(prompt);
     return result;
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Workflow failed with unknown error");
+    console.error("Error in workflow:", error);
+    throw error;
   }
 }

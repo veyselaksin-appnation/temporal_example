@@ -1,73 +1,114 @@
 import fastify from "fastify";
-import { Client } from "@temporalio/client";
-import { Connection } from "@temporalio/client";
-import { Callit } from "./callit/callit";
-
-interface PromptRequest {
-  prompt: string;
-}
-
-interface PromptResponse {
-  result: any;
-  error?: string;
-}
+import { Client, Connection } from "@temporalio/client";
 
 const app = fastify();
 
-// Initialize Callit with OpenAI API key
-const callit = new Callit(process.env.OPENAI_API_KEY || "");
-
-// Initialize Temporal client
 const start = async () => {
-  try {
-    const connection = await Connection.connect({
-      address: process.env.TEMPORAL_ADDRESS || "temporal:7233",
-    });
+  const connection = await Connection.connect({
+    address: process.env.TEMPORAL_ADDRESS || "temporal:7233",
+  });
+  const client = new Client({
+    connection,
+  });
 
-    const temporalClient = new Client({
-      connection,
-    });
+  app.post("/prompt", async (request, reply) => {
+    try {
+      const { prompt } = request.body as { prompt: string };
 
-    app.post<{ Body: PromptRequest; Reply: PromptResponse }>(
-      "/prompt",
-      async (request, reply) => {
+      if (!prompt) {
+        return reply.status(400).send({
+          error: "Prompt is required",
+        });
+      }
+
+      const workflowId = `prompt-${Date.now()}`;
+
+      // Set headers for streaming
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      // Start the workflow
+      const handle = await client.workflow.start("orchestrateFunction", {
+        taskQueue: "ai-orchestrator",
+        args: [prompt],
+        workflowId,
+      });
+
+      // Create a promise to wait for the stream signal
+      const checkSignal = async () => {
         try {
-          const { prompt } = request.body;
+          const execution = await client.workflow.getHandle(workflowId);
+          const history = await execution.fetchHistory();
 
-          // Get function call from Callit
-          const functionCall = await callit.createCompletion({ prompt });
+          // Find all stream signals
+          const streamEvents =
+            history.events?.filter(
+              (event) =>
+                event.workflowExecutionSignaledEventAttributes?.signalName ===
+                "streamSignal"
+            ) || [];
 
-          console.log("Function call:", functionCall);
-
-          // Start workflow
-          const handle = await temporalClient.workflow.start(
-            "orchestrateFunction",
-            {
-              taskQueue: "ai-orchestrator",
-              args: [functionCall],
-              workflowId: `orchestrate-${Date.now()}`,
+          // Process each stream signal
+          for (const event of streamEvents) {
+            if (event.workflowExecutionSignaledEventAttributes?.input) {
+              const input =
+                event.workflowExecutionSignaledEventAttributes.input;
+              if (input.payloads && input.payloads[0]?.data) {
+                const data = input.payloads[0].data;
+                try {
+                  const parsedData = JSON.parse(data.toString());
+                  // Send the chunk to the client
+                  reply.raw.write(`data: ${JSON.stringify(parsedData)}\n\n`);
+                } catch (parseError) {
+                  console.error("Error parsing stream data:", parseError);
+                }
+              }
             }
+          }
+
+          // Check if workflow is completed
+          const isCompleted = history.events?.some(
+            (event) => event.workflowExecutionCompletedEventAttributes
           );
 
-          // Get result
-          const result = await handle.result();
+          if (isCompleted) {
+            reply.raw.write("data: [DONE]\n\n");
+            reply.raw.end();
+            return;
+          }
 
-          return { result };
+          // Check again after 1 second
+          setTimeout(checkSignal, 1000);
         } catch (error) {
-          console.error("Workflow error:", error);
-          return reply.status(500).send({
-            result: null,
-            error:
-              error instanceof Error ? error.message : "Unknown error occurred",
-          });
+          console.error("Error checking signal:", error);
+          reply.raw.write(
+            `error: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }\n\n`
+          );
+          reply.raw.end();
         }
-      }
-    );
+      };
 
+      // Start checking for signals
+      checkSignal();
+    } catch (error) {
+      console.error("Error:", error);
+      reply.raw.write(
+        `error: ${error instanceof Error ? error.message : "Unknown error"}\n\n`
+      );
+      reply.raw.end();
+    }
+  });
+
+  try {
     await app.listen({ port: 3000, host: "0.0.0.0" });
     console.log("API Gateway running on port 3000");
   } catch (err) {
-    console.error("Startup error:", err);
+    console.error(err);
     process.exit(1);
   }
 };

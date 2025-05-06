@@ -30,9 +30,8 @@ interface CallitResponse {
   function: FunctionType;
   arguments: {
     input: string;
-    response: string;
   };
-  usage: {
+  usage?: {
     tokens: number;
     cost: number;
   };
@@ -46,17 +45,9 @@ interface CreateCompletionParams {
 
 class Callit {
   private readonly openai: OpenAI;
-  private readonly model = "gpt-4o-mini";
+  private readonly model = "gpt-4-turbo-preview";
   private readonly defaultTemperature = 0.7;
   private readonly defaultMaxTokens = 1000;
-  private readonly systemPrompt = `You are a function router that determines the appropriate function to call based on user input.
-Your task is to analyze the user's prompt and determine which function should be called:
-
-1. text2text: For general questions, explanations, or text-based tasks
-2. web_search: For queries that require up-to-date information or external data
-3. text2img: For requests to generate or describe images
-
-Respond with ONLY the function name (text2text, web_search, or text2img) and nothing else.`;
 
   constructor(private readonly apiKey: string) {
     this.openai = new OpenAI({
@@ -67,20 +58,44 @@ Respond with ONLY the function name (text2text, web_search, or text2img) and not
   private async determineFunctionType(prompt: string): Promise<FunctionType> {
     const completion = await this.openai.chat.completions.create({
       model: this.model,
-      messages: [
-        { role: "system", content: this.systemPrompt },
-        { role: "user", content: prompt },
+      messages: [{ role: "user", content: prompt }],
+      functions: [
+        {
+          name: "route_function",
+          description: "Route the user input to the appropriate function",
+          parameters: {
+            type: "object",
+            properties: {
+              functionType: {
+                type: "string",
+                enum: ["text2text", "web_search", "text2img"],
+                description: "The type of function to route to",
+              },
+              reasoning: {
+                type: "string",
+                description:
+                  "Brief explanation of why this function was chosen",
+              },
+            },
+            required: ["functionType"],
+          },
+        },
       ],
-      temperature: 0,
-      max_tokens: 10,
+      function_call: { name: "route_function" },
     });
 
-    const functionType =
-      completion.choices[0].message.content?.trim() as FunctionType;
-    if (!["text2text", "web_search", "text2img"].includes(functionType)) {
-      return "text2text"; // Default to text2text if invalid function type
+    console.log("Function call response:", completion);
+    const functionCall = completion.choices[0].message.function_call;
+    console.log(
+      "Function call:",
+      JSON.stringify(completion.choices[0].message, null, 2)
+    );
+    if (!functionCall) {
+      return "text2text"; // Default fallback
     }
-    return functionType;
+
+    const result = JSON.parse(functionCall.arguments);
+    return result.functionType as FunctionType;
   }
 
   async createCompletion(
@@ -92,47 +107,14 @@ Respond with ONLY the function name (text2text, web_search, or text2img) and not
       max_tokens,
     } = params;
 
-    // Determine which function to call
     const functionType = await this.determineFunctionType(prompt);
-
-    // Create completion
-    const completion = await this.openai.chat.completions.create({
-      model: this.model,
-      messages: [
-        {
-          role: "system",
-          content: this.systemPrompt,
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      temperature,
-      max_tokens,
-    });
-
-    const response = completion.choices[0].message.content || "";
-
-    // Calculate usage
-    const usage = {
-      tokens: completion.usage?.total_tokens || 0,
-      cost: this.calculateCost(completion.usage?.total_tokens || 0),
-    };
 
     return {
       function: functionType,
       arguments: {
         input: prompt,
-        response,
       },
-      usage,
     };
-  }
-
-  private calculateCost(tokens: number): number {
-    const costPerToken = 0.03 / 1000; // GPT-4 cost per token
-    return Number((tokens * costPerToken).toFixed(6));
   }
 }
 
