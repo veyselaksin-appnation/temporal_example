@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@temporalio/client": "^1.9.0",
+    "@ai-orchestrator/shared": "*",
     "fastify": "^4.24.3",
     "@fastify/cors": "^7.0.0",
     "openai": "^4.28.0"

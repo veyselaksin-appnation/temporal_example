@@ -1,17 +1,18 @@
 import fastify from "fastify";
 import { Client, Connection } from "@temporalio/client";
+import { API, TEMPORAL } from "@ai-orchestrator/shared";
 
 const app = fastify();
 
 const start = async () => {
   const connection = await Connection.connect({
-    address: process.env.TEMPORAL_ADDRESS || "temporal:7233",
+    address: TEMPORAL.ADDRESS,
   });
   const client = new Client({
     connection,
   });
 
-  app.post("/prompt", async (request, reply) => {
+  app.post(API.ENDPOINTS.PROMPT, async (request, reply) => {
     try {
       const { prompt } = request.body as { prompt: string };
 
@@ -32,7 +33,7 @@ const start = async () => {
 
       // Start the workflow
       const handle = await client.workflow.start("orchestrateFunction", {
-        taskQueue: "ai-orchestrator",
+        taskQueue: TEMPORAL.TASK_QUEUES.DEFAULT,
         args: [prompt],
         workflowId,
       });
@@ -105,8 +106,8 @@ const start = async () => {
   });
 
   try {
-    await app.listen({ port: 3000, host: "0.0.0.0" });
-    console.log("API Gateway running on port 3000");
+    await app.listen({ port: API.PORTS.GATEWAY, host: "0.0.0.0" });
+    console.log(`API Gateway running on port ${API.PORTS.GATEWAY}`);
   } catch (err) {
     console.error(err);
     process.exit(1);

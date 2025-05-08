@@ -13,7 +13,7 @@ interface Text2TextResponse {
 
 const app = fastify();
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_API_KEY = "";
 
 const openaiClient = new OpenAIClient({
   apiKey: OPENAI_API_KEY || "",
